@@ -83,8 +83,13 @@
 #if defined(__APPLE__)
 #include <libkern/OSCacheControl.h>
 #include <mach/mach.h>
-#include <mach/mach_vm.h>
 #include <mach/vm_page_size.h>
+// <mach/mach_vm.h> is a hard `#error mach_vm.h unsupported.` stub in the
+// iPhoneOS SDK - mach_vm_protect and friends are macOS-only. The iOS-callable
+// equivalent is vm_protect(), declared in <mach/vm_map.h>, which <mach/mach.h>
+// already pulls in, and on every 64-bit target libsyscall implements it as a
+// thin forward to mach_vm_protect with vm_address_t == mach_vm_address_t, so
+// nothing truncates and the VM_PROT_COPY semantics are identical.
 #endif
 
 namespace vt::ios {
@@ -214,7 +219,7 @@ inline bool protectPage(void* addr, bool writable) {
     const vm_prot_t prot = writable
                                ? (VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE | VM_PROT_COPY)
                                : (VM_PROT_READ | VM_PROT_EXECUTE);
-    return mach_vm_protect(mach_task_self(), page, vm_page_size, FALSE, prot) == KERN_SUCCESS;
+    return vm_protect(mach_task_self(), page, vm_page_size, FALSE, prot) == KERN_SUCCESS;
 }
 #else
 inline bool protectPage(void*, bool) { return false; }
